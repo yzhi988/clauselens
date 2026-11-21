@@ -11,6 +11,15 @@ import { severityLabels } from './engine/types';
 import { ContractReader } from './components/ContractReader';
 import { RiskPanel, type RiskFilter } from './components/RiskPanel';
 import { useOffline } from './useOffline';
+import { Calculator, type CalculatorLaunch } from './components/Calculator';
+import { Negotiation } from './components/Negotiation';
+import { defaultSelectedIds } from './engine/negotiation';
+
+type Module = 'review' | 'calculator' | 'negotiate';
+function moduleFromUrl(): Module {
+  const value = new URLSearchParams(window.location.search).get('module');
+  return value === 'calculator' || value === 'negotiate' ? value : 'review';
+}
 
 type Mode = Scenario | 'custom';
 type MobileView = 'document' | 'risk';
@@ -18,6 +27,9 @@ const modeIcons = { rental: House, internship: BriefcaseBusiness, fitness: Dumbb
 const initialResult = scanContract(samples[0].text, 'rental');
 
 export default function App() {
+  const [module, setModule] = useState<Module>(moduleFromUrl);
+  const [calculatorLaunch, setCalculatorLaunch] = useState<CalculatorLaunch | null>(null);
+  const [negotiationIds, setNegotiationIds] = useState<string[]>(() => defaultSelectedIds(initialResult.hits));
   const [mode, setMode] = useState<Mode>('rental');
   const [text, setText] = useState('');
   const [filter, setFilter] = useState<RiskFilter>('all');
@@ -35,6 +47,27 @@ export default function App() {
   const content = sample?.text ?? text;
   const result = useMemo(() => scanContract(content, mode === 'custom' ? 'auto' : mode), [content, mode]);
   const activeId = result.hits.some(hit => hit.id === selected) ? selected : null;
+  useEffect(() => { setNegotiationIds(defaultSelectedIds(result.hits)); }, [result]);
+  useEffect(() => {
+    const onPopState = () => setModule(moduleFromUrl());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  function switchModule(value: string) {
+    if (value !== 'review' && value !== 'calculator' && value !== 'negotiate') return;
+    if (value !== module) {
+      setModule(value);
+      const url = new URL(window.location.href);
+      if (value === 'review') url.searchParams.delete('module'); else url.searchParams.set('module', value);
+      window.history.pushState(null, '', url);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }
+  function launchCalculator(scenario: Scenario) {
+    setCalculatorLaunch(previous => ({ scenario, sequence: (previous?.sequence ?? 0) + 1, source: sample?.title ?? '我的合同（示例参数，请按实际调整）' }));
+    switchModule('calculator');
+    requestAnimationFrame(() => document.getElementById('module-calculator-tab')?.focus({ preventScroll: true }));
+  }
 
   useEffect(() => {
     if (mode === 'custom') return;
@@ -106,16 +139,17 @@ export default function App() {
   }
   const offlineLabel = cacheState === 'ready' ? (online ? '离线已就绪' : '离线模式') : cacheState === 'dev' ? '本地开发模式' : cacheState === 'loading' ? '准备离线资源' : '离线缓存未就绪';
 
-  return <div className="app-shell">
-    <a href="#workspace" className="skip-link">跳转到合同审阅台</a>
+  return <Tabs value={module} onValueChange={switchModule} className="app-shell">
+    <a href="#main-content" className="skip-link">跳转到工作区</a>
     <header className="brand-header"><div className="header-inner">
-      <a className="brand" href="#" aria-label="ClauseLens 条款透视镜首页" onClick={event => { event.preventDefault(); switchMode('rental'); }}><span className="brand-mark"><FileSearch size={26} strokeWidth={1.65} /></span><span className="brand-wordmark">Clause<span>Lens</span><small>条款透视镜</small></span></a>
-      <nav className="module-nav" aria-label="产品模块"><span className="current-module"><ScanLine size={16} />合同 X 光</span><span className="future-module">违约金计算器 <small>后续</small></span><span className="future-module">协商与导出 <small>后续</small></span></nav>
+      <a className="brand" href="#" aria-label="ClauseLens 条款透视镜首页" onClick={event => { event.preventDefault(); switchMode('rental'); switchModule('review'); }}><span className="brand-mark"><FileSearch size={26} strokeWidth={1.65} /></span><span className="brand-wordmark">Clause<span>Lens</span><small>条款透视镜</small></span></a>
+      <nav className="module-nav" aria-label="产品模块"><TabsList variant="line" className="module-tabs-list" aria-label="产品模块"><TabsTrigger value="review"><ScanLine size={16} />合同 X 光</TabsTrigger><TabsTrigger id="module-calculator-tab" value="calculator">违约金计算器</TabsTrigger><TabsTrigger value="negotiate">协商与导出</TabsTrigger></TabsList></nav>
       <button type="button" className="privacy-button" onClick={() => setPrivacyOpen(true)}><ShieldCheck size={16} /><span>隐私优先</span></button>
     </div></header>
     <div className="boundary-bar"><div><ShieldCheck size={16} /><p>仅作常见霸王条款风险提示与科普参考，不构成正式法律意见；<strong>所有内容均在浏览器本地分析，不上传服务器。</strong></p><button type="button" aria-label="查看法律与隐私边界" onClick={() => setPrivacyOpen(true)}><CircleHelp size={16} /></button></div></div>
 
-    <main className="main-container">
+    <main className="main-container" id="main-content" tabIndex={-1}>
+      <TabsContent value="review" forceMount className="module-content">
       <div className="intro-row"><div><div className="eyebrow"><span />让每一次签字，都更有底气</div><h1>合同 X 光审阅台<span className="round-label">公益开放工具</span></h1><p className="intro-description">看清那些小字里的大问题，把不对等的条款变成可以商量的事。</p></div><div className="local-status"><div><span className="status-dot" />本地分析，合同不离开你的设备</div><span><LockKeyhole size={12} /> 无需登录 · 无 AI 上传 · 无历史留存</span></div></div>
 
       <Tabs value={mode} onValueChange={switchMode} className="contract-tabs">
@@ -134,14 +168,17 @@ export default function App() {
           <div id="mobile-view-switch" className="mobile-view-switch" role="group" aria-label="切换原文与风险视图"><button type="button" aria-pressed={mobileView === 'document'} onClick={() => setMobileView('document')}><FileText size={16} />合同原文</button><button type="button" aria-pressed={mobileView === 'risk'} onClick={() => setMobileView('risk')}><ScanLine size={16} />风险解读<span>{result.hits.length}</span></button></div>
           <div className={`workspace mobile-${mobileView}`} id="workspace" tabIndex={-1}>
             <ContractReader result={result} sample={sample} selected={activeId} onSelect={id => navigate(id, 'risk', true)} custom={mode === 'custom'} />
-            <RiskPanel result={result} selected={activeId} filter={filter} onFilter={setFilter} onSelect={id => navigate(id, 'document', false)} onLocate={id => navigate(id, 'document', true)} onCollapse={() => setSelected(null)} hasText={!!content.trim()} />
+            <RiskPanel result={result} selected={activeId} filter={filter} onFilter={setFilter} onSelect={id => navigate(id, 'document', false)} onLocate={id => navigate(id, 'document', true)} onCollapse={() => setSelected(null)} hasText={!!content.trim()} onCalculate={launchCalculator} />
           </div>
           <p className="sr-only" role="status">{content.trim() ? `扫描完成，共${result.hits.length}处风险：高危${result.counts.high}，警惕${result.counts.medium}，注意${result.counts.low}。` : '等待输入合同。'}</p>
         </TabsContent>
       </Tabs>
-      <footer className="app-footer"><span><Heart size={13} />让法律常识，成为每个人的日常工具。</span><div><button type="button" className="footer-privacy" onClick={() => setPrivacyOpen(true)}>法律与隐私边界</button><span className="footer-divider" /><span className="offline-status" title="生产版首次联网缓存完成后，同一浏览器可断网刷新；开发模式不启用离线缓存。">{!online ? <WifiOff size={13} /> : <span className={`status-dot ${cacheState === 'ready' ? '' : 'neutral'}`} />}{offlineLabel}</span><span className="version">v0.1</span></div></footer>
+      </TabsContent>
+      <TabsContent value="calculator" forceMount className="module-content"><Calculator launch={calculatorLaunch} onReview={() => switchModule('review')} /></TabsContent>
+      <TabsContent value="negotiate" forceMount className="module-content"><Negotiation title={sample?.title ?? '我的合同'} result={result} scenario={mode === 'custom' ? 'auto' : mode} selectedIds={negotiationIds} onSelection={setNegotiationIds} onReview={() => switchModule('review')} /></TabsContent>
+      <footer className="app-footer"><span><Heart size={13} />让法律常识，成为每个人的日常工具。</span><div><button type="button" className="footer-privacy" onClick={() => setPrivacyOpen(true)}>法律与隐私边界</button><span className="footer-divider" /><span className="offline-status" title="生产版首次联网缓存完成后，同一浏览器可断网刷新；开发模式不启用离线缓存。">{!online ? <WifiOff size={13} /> : <span className={`status-dot ${cacheState === 'ready' ? '' : 'neutral'}`} />}{offlineLabel}</span><span className="version">v0.2</span></div></footer>
     </main>
-    <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}><DialogContent className="privacy-dialog" showCloseButton={false}><DialogClose className="dialog-close" aria-label="关闭隐私说明"><X size={19} /></DialogClose><div className="privacy-dialog-icon"><ShieldCheck size={25} /></div><DialogTitle>你的合同，只留在你的设备</DialogTitle><DialogDescription>ClauseLens 的法律、隐私与离线边界</DialogDescription><div className="privacy-body"><section><h3>我们做什么，不做什么</h3><p>使用18条本地规则提示常见风险，不连接远程 AI，不判断合同最终效力，不保证发现全部问题。等级表示复核优先级，不是司法结论。适用于中国大陆合同科普，重要事项请咨询专业人士。</p></section><section><h3>文本不上传，也不保存</h3><p>粘贴或导入的内容仅在当前标签页内存中分析。切换样本时暂存，清空、刷新或关闭页面即清除。不写入浏览器持久存储，不记录日志、不使用统计埋点。剪贴板仅在点击复制时写入。</p></section><section><h3>“离线可用”的前提</h3><p>生产版首次联网加载，显示“离线已就绪”后，同一浏览器、同一地址可断网刷新。缓存只含应用和虚构样本，不含你的合同。首次访问或清理缓存后需重新联网。开发模式不启用离线缓存。</p></section><section><h3>仍需注意的边界</h3><p>托管方可能记录静态页面访问的基础元数据；合同内容不会发送。浏览器扩展、共享设备及系统剪贴板不在应用控制范围内。点击下方官方法条链接会主动访问外部网站，离线时仍可阅读卡片内的要点。</p></section><div className="legal-source-links"><a href={legalSources.civil} target="_blank" rel="noopener noreferrer">民法典 · 官方全文 ↗</a><a href={legalSources.labor} target="_blank" rel="noopener noreferrer">劳动合同法 · 官方全文 ↗</a></div></div></DialogContent></Dialog>
-  </div>;
+    <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}><DialogContent className="privacy-dialog" showCloseButton={false}><DialogClose className="dialog-close" aria-label="关闭隐私说明"><X size={19} /></DialogClose><div className="privacy-dialog-icon"><ShieldCheck size={25} /></div><DialogTitle>你的合同，只留在你的设备</DialogTitle><DialogDescription>ClauseLens 的法律、隐私与离线边界</DialogDescription><div className="privacy-body"><section><h3>我们做什么，不做什么</h3><p>使用18条本地规则提示常见风险，不连接远程 AI，不判断合同最终效力，不保证发现全部问题。等级表示复核优先级，不是司法结论。适用于中国大陆合同科普，重要事项请咨询专业人士。</p></section><section><h3>文本不上传，也不保存</h3><p>粘贴或导入的内容仅在当前标签页内存中分析。切换样本时暂存，清空、刷新或关闭页面即清除。不写入浏览器持久存储，不记录日志、不使用统计埋点。金额推演、勾选与沟通文本也仅保留在内存；导出通过本地生成 HTML 或 Markdown 文件完成，不上传、不调用云端转换。剪贴板仅在点击复制时写入。</p></section><section><h3>“离线可用”的前提</h3><p>生产版首次联网加载，显示“离线已就绪”后，同一浏览器、同一地址可断网刷新。缓存只含应用和虚构样本，不含你的合同。首次访问或清理缓存后需重新联网。开发模式不启用离线缓存。</p></section><section><h3>仍需注意的边界</h3><p>托管方可能记录静态页面访问的基础元数据；合同内容不会发送。浏览器扩展、共享设备及系统剪贴板不在应用控制范围内。点击下方官方法条链接会主动访问外部网站，离线时仍可阅读卡片内的要点。</p></section><div className="legal-source-links"><a href={legalSources.civil} target="_blank" rel="noopener noreferrer">民法典 · 官方全文 ↗</a><a href={legalSources.labor} target="_blank" rel="noopener noreferrer">劳动合同法 · 官方全文 ↗</a></div></div></DialogContent></Dialog>
+  </Tabs>;
 }
 function BookNotice() { return <CircleHelp size={16} />; }

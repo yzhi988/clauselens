@@ -16,10 +16,11 @@ function MarkedText({ text, hits, selected, onSelect }: { text: string; hits: Ri
     if (!active.length) return <Fragment key={start}>{text.slice(start, end)}</Fragment>;
     const hit = active.find(item => item.id === selected) ?? active[0];
     // Split overlapping hits at their boundaries; never drop or duplicate original text.
-    return <button key={start} type="button" id={hit.ranges[0].start === start ? `mark-${hit.id}` : undefined}
+    return <span key={start} role="button" tabIndex={0} id={hit.ranges[0].start === start ? `mark-${hit.id}` : undefined}
       className={`text-mark ${hit.rule.severity} ${selected === hit.id ? 'is-focused' : ''}`}
       aria-label={`${severityLabels[hit.rule.severity]}：${hit.rule.title}。查看风险解读`}
-      aria-pressed={selected === hit.id} onClick={() => onSelect(hit.id)}>{text.slice(start, end)}</button>;
+      aria-pressed={selected === hit.id} onClick={() => onSelect(hit.id)}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(hit.id); } }}>{text.slice(start, end)}</span>;
   })}</>;
 }
 
