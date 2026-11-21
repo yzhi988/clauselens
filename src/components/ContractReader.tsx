@@ -45,7 +45,7 @@ export function ContractReader({ result, sample, selected, onSelect, custom }: P
         })}</div>
         <div className="end-of-document"><span />文档结束<span /></div>
         {!custom && <p className="sample-note">本合同为虚构教学样本，特意包含不平衡条款，请勿直接用于签约。</p>}
-      </div> : <div className="empty-state"><ScanLine size={38} strokeWidth={1.2} /><h3>从一份合同开始</h3><p>在上方粘贴正文，或选择 .txt 文件。<br />输入后会自动标出命中的风险片段。</p></div>}
+      </div> : <div className="empty-state"><ScanLine size={38} strokeWidth={1.2} /><h3>从一份合同开始</h3><p>在上方粘贴正文，或选择 / 拖入 TXT、DOCX 文件。<br />输入后会自动标出命中的风险片段。</p></div>}
     </div>
     <div className="document-footer"><span><span className="status-dot" />纯文本本地解析</span><span>不识别手写、图片或附件</span></div>
   </section>;

@@ -97,7 +97,7 @@ test('375px 无横向溢出、原文与风险联动、粘贴、txt导入和错�
   await expect(page.locator('.risk-card')).toHaveCount(1);
   await expect(input).toHaveValue(/健身会员/);
   await page.locator('input[type=file]').setInputFiles({ name: 'wrong.pdf', mimeType: 'application/pdf', buffer: Buffer.from('text') });
-  await expect(page.locator('#input-error')).toContainText('只支持 .txt');
+  await expect(page.locator('#input-error')).toContainText(/\.txt.*\.docx/);
   await expect(input).toHaveValue(/健身会员/);
   await page.getByRole('button', { name: '清空', exact: true }).click();
   await expect(input).toBeEmpty();
@@ -137,7 +137,8 @@ test('缓存完成后断网刷新，三样本与本地扫描完整可用且不�
     }
     return entries;
   });
-  expect(cached.length).toBe(4);
+  expect(cached.length).toBeGreaterThanOrEqual(4);
+  expect(cached.every(entry => /\/(?:index\.html|favicon\.svg|assets\/[^/]+\.(?:js|css))$/.test(entry.url))).toBe(true);
   expect(cached.every(entry => !entry.body.includes(personal) && !entry.url.includes('PERSONAL'))).toBe(true);
   expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);
   await expectLocalOnly(page);

@@ -5,14 +5,14 @@ import type { ScanResult, ScanScenario } from '../engine/types';
 import { severityLabels } from '../engine/types';
 import { buildNegotiationText, buildNegotiationMarkdown, buildPrintableHtml, defaultSelectedIds, groupRedlines, type Tone } from '../engine/negotiation';
 
-interface Props { title: string; result: ScanResult; scenario: ScanScenario; selectedIds: string[]; onSelection: (ids: string[]) => void; onReview: () => void }
+interface Props { title: string; result: ScanResult; scenario: ScanScenario; selectedIds: string[]; onSelection: (ids: string[]) => void; onReview: () => void; onReport: () => void }
 function downloadLocal(content: string, fileName: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = fileName;
   document.body.append(anchor);
   try { anchor.click(); } finally { anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
 }
-export function Negotiation({ title, result, scenario, selectedIds, onSelection, onReview }: Props) {
+export function Negotiation({ title, result, scenario, selectedIds, onSelection, onReview, onReport }: Props) {
   const [tone, setTone] = useState<Tone>('gentle');
   const [feedback, setFeedback] = useState('');
   const input = useMemo(() => ({ title, clauses: result.clauses, hits: result.hits, selectedIds, tone, scenario }), [title, result, selectedIds, tone, scenario]);
@@ -34,7 +34,7 @@ export function Negotiation({ title, result, scenario, selectedIds, onSelection,
   }
   return <section aria-label="协商清单与修订导出">
     <div className="intro-row module-intro"><div><div className="eyebrow"><span />把担心，变成一份具体的修改请求</div><h1>协商与导出<span className="round-label">协商草案 · 未达成合意</span></h1><p className="intro-description">选好要谈的条款，带上完整话术和修订对照。不替你发送，不替双方作决定。</p></div><button type="button" className="subtle-button" onClick={onReview}><ArrowLeft size={14} />返回审阅 / 换合同</button></div>
-    <div className="current-contract"><FileCheck2 size={18} /><div><span>当前审阅合同</span><strong>{title}</strong></div><span className="quiet-chip">{result.hits.length} 处命中 · 已选 {count} 处</span></div>
+    <div className="current-contract"><FileCheck2 size={18} /><div><span>当前审阅合同</span><strong>{title}</strong></div><span className="quiet-chip">{result.hits.length} 处命中 · 已选 {count} 处</span><button type="button" className="subtle-button" disabled={!result.clauses.length} onClick={onReport}><Download size={14} />导出体检卡（PNG）</button></div>
     <div className="negotiation-grid"><aside className="panel negotiation-selection"><div className="section-heading"><span className="step-label">01</span><h2>选出这次要谈的事项</h2></div><p className="field-hint">默认选择高危与警惕，可按你的实际需要调整。</p><div className="selection-actions"><button type="button" onClick={() => onSelection(defaultSelectedIds(result.hits))}>恢复默认</button><button type="button" onClick={() => onSelection(result.hits.map(hit => hit.id))}>全选</button><button type="button" onClick={() => onSelection([])}>清空选择</button></div>
       <div className="selection-list">{result.hits.map(hit => <label key={hit.id} className={`selection-item ${selectedIds.includes(hit.id) ? 'chosen' : ''}`}><input type="checkbox" checked={selectedIds.includes(hit.id)} onChange={event => onSelection(event.target.checked ? [...selectedIds, hit.id] : selectedIds.filter(id => id !== hit.id))} /><span><span className="selection-meta"><i className={`clause-dot ${hit.rule.severity}`} />{severityLabels[hit.rule.severity]}<span>{result.clauses.find(clause => clause.id === hit.clauseId)?.number}</span></span><strong>{hit.rule.title}</strong><small>{hit.excerpt}</small></span></label>)}</div>
       {!result.hits.length && <div className="empty-state small"><FileCheck2 size={28} /><h3>当前没有规则命中</h3><p>可以回到审阅台输入合同或切换样本。没有命中不代表合同安全。</p></div>}

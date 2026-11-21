@@ -9,6 +9,7 @@ interface Props {
   onFilter: (filter: RiskFilter) => void; onSelect: (id: string) => void;
   onLocate: (id: string) => void; onCollapse: () => void; hasText: boolean;
   onCalculate: (scenario: Scenario) => void;
+  onReport: () => void;
 }
 
 const calculableRules = new Set(['rental-deposit', 'rental-penalty', 'internship-training', 'internship-pay', 'fitness-refund', 'fitness-closure', 'fitness-fees']);
@@ -40,13 +41,14 @@ function RiskCard({ hit, index, expanded, onSelect, onLocate, onCollapse, onCalc
   </article>;
 }
 
-export function RiskPanel({ result, selected, filter, onFilter, onSelect, onLocate, onCollapse, hasText, onCalculate }: Props) {
+export function RiskPanel({ result, selected, filter, onFilter, onSelect, onLocate, onCollapse, hasText, onCalculate, onReport }: Props) {
   const filtered = result.hits.filter(hit => filter === 'all' || hit.rule.severity === filter);
   return <aside className="risk-panel" aria-label="风险解读">
     <section className="risk-summary panel">
       <div className="summary-title"><h2><ScanIcon />风险体检</h2><span className="summary-tag">规则扫描 · 非法律鉴定</span></div>
       <div className="summary-verdict"><div><span className={`rating ${result.overall}`}>{result.overall === 'none' ? (hasText ? '暂无规则命中' : '等待输入') : result.overall === 'high' ? '高风险' : result.overall === 'medium' ? '需警惕' : '需注意'}</span><p>{result.hits.length ? `发现 ${result.hits.length} 处风险，建议先沟通再签署` : hasText ? '未命中不代表合同安全，请继续核对具体约定' : '文本留在本地，输入后即刻审阅'}</p></div><div className={`summary-stamp ${result.overall}`}><ShieldCheck size={28} strokeWidth={1.3} /></div></div>
       <div className="risk-counts">{severityOrder.map(level => <button type="button" key={level} className={`count-cell ${level} ${filter === level ? 'selected' : ''}`} aria-pressed={filter === level} aria-label={`筛选${severityLabels[level]}，${result.counts[level]}处`} onClick={() => onFilter(filter === level ? 'all' : level)}><span className="count-number">{result.counts[level]}</span><span><span className={`clause-dot ${level}`} />{severityLabels[level]}</span></button>)}</div>
+      <button type="button" className="report-link" disabled={!hasText} onClick={onReport}>导出体检卡（PNG）<ArrowUpRight size={13} /></button>
     </section>
     <div className="risk-list-heading"><h3>逐条风险解读 <span>{filtered.length}</span></h3><button type="button" className={filter !== 'all' ? 'filter-reset active' : 'filter-reset'} aria-label="显示全部风险" onClick={() => onFilter('all')}><ListFilter size={14} />{filter === 'all' ? '全部风险' : '清除筛选'}</button></div>
     <div className="risk-list" id="risk-list">
