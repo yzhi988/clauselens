@@ -1,6 +1,16 @@
 import type { Clause, RiskHit, Scenario } from './types';
 
 export type Tone = 'gentle' | 'firm';
+export const MAX_EXPORT_TITLE_LENGTH = 80;
+
+/** Private, in-memory document title; never pass this value to the PNG report. */
+export function cleanExportTitle(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, '')
+    .slice(0, MAX_EXPORT_TITLE_LENGTH).replace(/[\ud800-\udbff]$/, '');
+}
+export function customExportTitle(value: string): string {
+  return cleanExportTitle(value).trim() || '我的合同';
+}
 
 export interface NegotiationInput {
   title: string;

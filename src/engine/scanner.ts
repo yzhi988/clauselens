@@ -12,7 +12,7 @@ interface ClauseMarker {
 function isShortTitle(text: string): boolean {
   return text.length > 0 && text.length <= 20
     && !/[，,。.!！?？；;：:<>]/u.test(text)
-    && !/(?:应当|必须|不得|无需|无须|有权|无权|可以|一律|任何|不予|不退|不承担|须|应|均|全部|所有|承担|(?<!与|及)支付|扣除|扣减|赔偿|收取|归属于)/u.test(text);
+    && !/(?:应当|必须|不得|无需|无须|有权|无权|可以|一律|任何|不予|不退|不承担|须|应|均|全部|所有|承担|(?<!与|及)支付|扣除|扣减|赔偿|收取|归属于|归(?:本店|甲方|公司|商家)|作废|没收|调涨|涨价|上调|清零)/u.test(text);
 }
 
 function splitTitle(content: string): { title: string; text: string } {
@@ -71,9 +71,9 @@ export function parseClauses(text: string): Clause[] {
   return clauses;
 }
 
-function matchRanges(text: string, rule: RiskRule): MatchRange[] {
+function findRanges(text: string, patterns: RegExp[]): MatchRange[] {
   const ranges: MatchRange[] = [];
-  for (const pattern of rule.patterns) {
+  for (const pattern of patterns) {
     // Patterns describe searchable text, not a mutable regex cursor. Cloning
     // leaves caller-owned lastIndex untouched; matchAll advances empty matches
     // correctly even for Unicode surrogate pairs. Empty highlights are omitted.
@@ -83,9 +83,23 @@ function matchRanges(text: string, rule: RiskRule): MatchRange[] {
     }
   }
 
-  ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+  return ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+}
+
+function matchRanges(text: string, patterns: RegExp[], ignorePatterns: RegExp[] = []): MatchRange[] {
+  const ranges = findRanges(text, patterns);
+  if (!ranges.length) return [];
+  const ignored = findRanges(text, ignorePatterns);
   const merged: MatchRange[] = [];
+  let ignoreIndex = 0;
+  let ignoredEnd = -1;
   for (const range of ranges) {
+    // Track containment, not mere overlap or a whole-document safety keyword.
+    // A sorted sweep avoids quadratic work for repeated safe/risky sentences.
+    while (ignoreIndex < ignored.length && ignored[ignoreIndex].start <= range.start) {
+      ignoredEnd = Math.max(ignoredEnd, ignored[ignoreIndex++].end);
+    }
+    if (range.end <= ignoredEnd) continue;
     const previous = merged[merged.length - 1];
     if (previous && range.start < previous.end) previous.end = Math.max(previous.end, range.end);
     else merged.push({ ...range });
@@ -100,16 +114,25 @@ export function scanContract(
   ruleSet: RiskRule[] = rules,
 ): ScanResult {
   const clauses = parseClauses(text);
-  const activeRules = ruleSet.filter(rule => scenario === 'auto'
-    ? new RegExp(rule.context.source, rule.context.flags).test(text)
-    : rule.scenario === scenario);
+  const activeRules = ruleSet
+    .filter(rule => scenario === 'auto' || rule.scenario === scenario)
+    .map(rule => {
+      const hasContext = scenario !== 'auto'
+        || new RegExp(rule.context.source, rule.context.flags.replace(/[gy]/g, '')).test(text);
+      // A standalone match never unlocks the other patterns in this rule.
+      const patterns = hasContext
+        ? [...new Set([...rule.patterns, ...(rule.standalonePatterns ?? [])])]
+        : rule.standalonePatterns ?? [];
+      return { rule, patterns };
+    })
+    .filter(({ patterns }) => patterns.length > 0);
   const hits: RiskHit[] = [];
   const counts: ScanResult['counts'] = { high: 0, medium: 0, low: 0 };
 
   for (const clause of clauses) {
     const clauseHits: RiskHit[] = [];
-    for (const rule of activeRules) {
-      const ranges = matchRanges(clause.text, rule);
+    for (const { rule, patterns } of activeRules) {
+      const ranges = matchRanges(clause.text, patterns, rule.ignorePatterns);
       if (!ranges.length) continue;
       clauseHits.push({
         id: `${clause.id}-${rule.id}`,

@@ -13,7 +13,11 @@ export interface RiskRule {
   suggestion: string;
   script: string;
   patterns: RegExp[];
-  /** Auto mode requires contract context; explicit sample scenarios bypass this guard. */
+  /** Complete, high-confidence expressions allowed in auto mode without context. */
+  standalonePatterns?: RegExp[];
+  /** Only positive matches fully contained in an ignored range are suppressed. */
+  ignorePatterns?: RegExp[];
+  /** Full-text guard for ordinary patterns; explicit scenarios bypass this guard. */
   context: RegExp;
 }
 export interface Clause { id: string; number: string; title: string; text: string }

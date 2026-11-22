@@ -65,6 +65,6 @@ export async function renderReportPng(data: ReportData): Promise<Blob> {
   box(44, 537, 392, 1, '#E4E7E2', 0);
   wrap(REPORT_DISCLAIMER, 44, 560, 392, 11, 18);
   text('本地生成 · 不含合同原文与金额明细', 44, 600, 10, '#66716D');
-  text('v0.3', 412, 600, 10, '#66716D');
+  text('v0.4', 412, 600, 10, '#66716D');
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('未能生成图片，请重试。')), 'image/png'));
 }

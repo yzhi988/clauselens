@@ -50,11 +50,12 @@ export function RiskPanel({ result, selected, filter, onFilter, onSelect, onLoca
       <div className="risk-counts">{severityOrder.map(level => <button type="button" key={level} className={`count-cell ${level} ${filter === level ? 'selected' : ''}`} aria-pressed={filter === level} aria-label={`筛选${severityLabels[level]}，${result.counts[level]}处`} onClick={() => onFilter(filter === level ? 'all' : level)}><span className="count-number">{result.counts[level]}</span><span><span className={`clause-dot ${level}`} />{severityLabels[level]}</span></button>)}</div>
       <button type="button" className="report-link" disabled={!hasText} onClick={onReport}>导出体检卡（PNG）<ArrowUpRight size={13} /></button>
     </section>
-    <div className="risk-list-heading"><h3>逐条风险解读 <span>{filtered.length}</span></h3><button type="button" className={filter !== 'all' ? 'filter-reset active' : 'filter-reset'} aria-label="显示全部风险" onClick={() => onFilter('all')}><ListFilter size={14} />{filter === 'all' ? '全部风险' : '清除筛选'}</button></div>
+    <div className="risk-list-heading"><h3>逐条风险解读 <span>{filtered.length}</span></h3>{filter === 'all' ? <span className="filter-reset"><ListFilter size={14} />全部风险</span> : <button type="button" className="filter-reset active" onClick={() => onFilter('all')}><ListFilter size={14} />清除筛选</button>}</div>
     <div className="risk-list" id="risk-list">
       {filtered.map(hit => <RiskCard key={hit.id} hit={hit} index={result.hits.indexOf(hit)} expanded={selected === hit.id} onSelect={() => onSelect(hit.id)} onLocate={() => onLocate(hit.id)} onCollapse={onCollapse} onCalculate={onCalculate} />)}
-      {!filtered.length && <div className="empty-state small"><ShieldCheck size={30} strokeWidth={1.2} /><h3>{!hasText ? '准备好，帮你多看一眼' : filter !== 'all' ? '没有这一等级的命中' : '未命中内置规则'}</h3><p>{filter !== 'all' ? '可点击“全部风险”查看其他提示。' : '规则无法覆盖所有表达或隐含风险，\n重要合同仍建议咨询专业人士。'}</p></div>}
-      {result.hits.length > 0 && <div className="review-note">提示可能存在误报或遗漏。<br />风险等级用于安排复核顺序，不是法律效力结论。</div>}
+      {!filtered.length && <div className="empty-state small"><ShieldCheck size={30} strokeWidth={1.2} /><h3>{!hasText ? '准备好，帮你多看一眼' : filter !== 'all' ? '没有这一等级的命中' : '未命中内置规则'}</h3><p>{filter !== 'all' ? '可点击“清除筛选”查看其他提示。' : '规则无法覆盖所有表达或隐含风险，\n重要合同仍建议咨询专业人士。'}</p></div>}
+      <div className="review-note">提示可能存在误报或遗漏。<br />风险等级用于安排复核顺序，不是法律效力结论。</div>
+      <details className="rule-literacy"><summary>为什么换个说法可能会漏报？</summary><div><p>这里使用有限的本地表达规则，不是能理解整份合同的 AI。相同意思换种写法、拆到不同条款，或省略背景，都可能漏报。</p><p><strong>直白表达：</strong>“扣除全部押金”较容易识别。<br /><strong>含蓄表达：</strong>“保证款用于覆盖退出安排”可能漏报，却仍值得追问用途、凭证与退还条件。</p><p>也要分清方向：“不得扣除全部押金”与“可以扣除全部押金”含义相反。只粘贴一句时可手选场景；未标红也请核对收费、退出和免责约定，结合完整合同判断。</p></div></details>
     </div>
   </aside>;
 }

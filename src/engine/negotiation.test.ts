@@ -3,6 +3,9 @@ import {
   buildNegotiationMarkdown,
   buildNegotiationText,
   buildPrintableHtml,
+  cleanExportTitle,
+  customExportTitle,
+  MAX_EXPORT_TITLE_LENGTH,
   defaultSelectedIds,
   groupRedlines,
   selectedHits,
@@ -65,6 +68,30 @@ function decodeEntities(text: string): string {
 
 const builders = [buildNegotiationText, buildNegotiationMarkdown, buildPrintableHtml];
 afterEach(() => vi.restoreAllMocks());
+
+describe('v0.4 自定义导出标题', () => {
+  it.each(['', ' \t\r\n', '\u0000\u202e\u2066'])('空白或控制字符回退到我的合同：%j', value => {
+    expect(customExportTitle(value)).toBe('我的合同');
+  });
+  it('保留编辑中空格，输出去首尾空白，删除控制字符', () => {
+    expect(cleanExportTitle(' 标\n题\u0000\u202e ')).toBe(' 标题 ');
+    expect(customExportTitle(' 标题 ')).toBe('标题');
+  });
+  it('限制80个UTF16字符，不截出孤立高代理项', () => {
+    expect(cleanExportTitle('合'.repeat(81))).toHaveLength(MAX_EXPORT_TITLE_LENGTH);
+    expect(cleanExportTitle('合'.repeat(79) + '𠮷')).toBe('合'.repeat(79));
+    expect(cleanExportTitle('𠮷'.repeat(41))).toBe('𠮷'.repeat(40));
+  });
+  it('私有标题进入清单和HTML但仍按文本转义，不改变勾选', () => {
+    const title = customExportTitle('<img src=x onerror=alert(1)>私有标题![图](https://example.invalid)');
+    const input = fixture({ title });
+    expect(buildNegotiationText(input)).toContain(title);
+    const html = buildPrintableHtml(input);
+    expect(html).toContain('&lt;img'); expect(html).not.toContain('<img');
+    expect(buildNegotiationMarkdown(input)).not.toContain('![图](');
+    expect(input.selectedIds).toEqual(['penalty', 'deposit']);
+  });
+});
 
 describe('默认选择和当前有效选择', () => {
   it('只选 high/medium，保留传入文档顺序而非按严重程度排列', () => {
